@@ -4,8 +4,8 @@
 Click the source chip in the header to swap to the scripted demo and back.
 
 ```
-live  · ratiocore agent_memory @ 127.0.0.1:3301 (agent_memory, role=guest, select-only)
-demo  · the scripted seven-cycle programme in dashboard/capture.py
+live · ratiocore agent memory @ 127.0.0.1:3301 (tool_event + turn_traces, role=guest, select-only)
+demo · the scripted seven-cycle programme in dashboard/capture.py
 ```
 
 If the memory is unreachable the server falls back to the demo **and says so**
@@ -23,7 +23,7 @@ rather than promised in one.
 | Where | What it guarantees |
 |---|---|
 | **Connection role** | connects as `guest`, whose only grant is `session,usage` on `universe`. It has no space grants at all. |
-| **Statements** | the only statement issued is `box.space.agent_memory:select(...)`, paged. There is no `insert`, `replace`, `update`, `delete`, `truncate` or `upsert` anywhere in `cimemory/live/`. |
+| **Statements** | the only statements issued are paged `select(...)` reads and `format()` introspection. There is no `insert`, `replace`, `update`, `delete`, `truncate` or `upsert` anywhere in `cimemory/live/`. |
 | **Runtime guard** | `ReadOnlyTarantool.verify_read_only()` reads `box.schema.user.info` and raises `PermissionError` if the user holds any write grant — so pointing this at a writable user fails loudly instead of mutating production. |
 | **Test** | `tests/test_live.py::test_the_module_cannot_write` inspects the module's own source and fails if a mutation call ever appears in it. |
 
@@ -152,3 +152,95 @@ print(fleet.stations[0].defect_rate, fleet.stations[0].waste_detail)
 
 Requires the `tarantool` client library — imported lazily, so the plugin
 itself and the demo source stay **stdlib-only**.
+
+
+---
+
+## 6. The full evidence base (measurement only)
+
+The first version of the wiring read `agent_memory` alone: 739 tool calls over
+about three days. But `agent_memory` is the *conversational* record, not the
+whole floor. Production also keeps a call-level ledger and a cost trace, and
+they cover an order of magnitude more work:
+
+| Space | What it is | Rows at the time of writing |
+|---|---|---|
+| `agent_memory` | turns; `lesson`/`outcome` rows are the qualitative evidence | ~1 128 |
+| `tool_event` | one row per tool call: `status`, `is_error`, `exit_code`, `blocked_reason` | 11 864 |
+| `turn_traces` | what a turn cost: `duration_ms`, `tokens_in`, `tokens_out`, `tool_calls` | 23 |
+| `agent_runtime_config` | the revisioned actuator surface, read **only as a time marker** | 12 |
+| `agent_revision` | revision activation times, `change_reason`, actor | 19 |
+| `rb_insight` | documented insights and their `uses` counter | 83 |
+
+Where the two ledgers overlap they agree exactly — 759 overlapping calls, 759
+agree, 0 disagree — so either can serve as the defect ledger. `tool_event` is
+preferred because it is wider, and the board reports which one it used
+(`meta.defect_source`) rather than assuming.
+
+### 6.1 The four muda axes
+
+A defect rate alone sees only one kind of waste. `turn_traces` makes three
+more measurable, each in its own unit:
+
+| Axis | Unit | Muda |
+|---|---|---|
+| `defects` | defects per 100 tool calls | Defects |
+| `waiting` | mean turn duration (ms) | Waiting |
+| `overprocessing` | mean prompt tokens per turn | Over-processing |
+| `motion` | mean tool calls per turn | Motion |
+
+The axes are **not summed**. A millisecond and a defect are not commensurable,
+so each axis is judged against the median of the same axis across the fleet,
+and the station's `worst_muda` is the axis where it exceeds that standard by
+the largest *ratio*. Axes with no fleet standard (nobody has traces) are
+excluded, never treated as zero.
+
+### 6.2 The measurement's own limits, reported
+
+Three things the wiring deliberately refuses to hide:
+
+**Coverage.** `meta.coverage` reports how much evidence is attributable to a
+configuration at all. At the time of writing: **661 of 11 864 events (5.6 %)**.
+The other 94.4 % come from agents with no `agent_runtime_config` row — and
+those agents (`ginger`, `tanya`, `trin`, plus `dimi` and `presales`) are
+precisely the high-volume ones. An agent the system does not govern is an
+agent whose improvement cannot be attributed to a change. That is a finding,
+not a gap in the code.
+
+**Comparability.** A rate over five calls is not a capability. Every window
+carries `comparable`, true only when the window holds at least
+`MIN_EVIDENCE` (30) events. A window below the floor is drawn hollow grey and
+its label says `NOT COMPARABLE`, so it can never be read as an improvement. In
+the current data every station's *after* window is below the floor, so **no
+before/after claim is supportable anywhere in the fleet** — which is the
+honest answer, and the reason the check step of the loop cannot be closed yet.
+
+**Definition drift.** The revision tables qualify the agent id
+(`agent-silver-predman`) while the event ledger uses the bare profile
+(`predman`). The join normalises with an escaped pattern: in Lua `-` is a
+quantifier, so `^agent-silver-` silently matches "agent-silve" and every
+window collapses into `no-config`. `normalise_agent()` escapes it, and a test
+pins the behaviour.
+
+### 6.3 What the revision join is, and is not
+
+A revision activation time is a **time marker**, nothing more. The board
+segments a station's evidence at those markers so a before/after can be
+*shown* — it never claims the configuration caused the difference. The
+staircase draws:
+
+* one dashed column per revision window, labelled with the revision;
+* the **actual** rate of each window;
+* the **standard**, seeded with the fleet median, which only ever tightens —
+  a window worse than the standing standard does not move it, so the baseline
+  is never lowered to accommodate a bad shift.
+
+### 6.4 Yokoten, measured
+
+`rb_insight` carries a `uses` counter, so "was this countermeasure adopted?"
+is a number rather than an opinion. Current reading: **83 insights, 22 used at
+least once, 61 never used**. The yokoten view draws the unused ones as
+*not-spread* items — a countermeasure written down and never applied has not
+left its author, let alone reached a sibling. Where a station has no measured
+standard at all, the finding is still shown and is labelled `no standard yet`
+rather than being hung on an invented standard id.

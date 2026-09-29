@@ -143,20 +143,39 @@ Design rationale, frame schema and how to add a view:
 
 ## Live: the board reads production memory (read-only)
 
-By default the board opens on **real agent memory in Tarantool**
-(`agent_memory`, port 3301), not on the script:
+By default the board opens on **real agent telemetry in Tarantool** (port
+3301), not on the script:
 
 ```
-live  · ratiocore agent_memory @ 127.0.0.1:3301 (agent_memory, role=guest, select-only)
+live · ratiocore agent memory @ 127.0.0.1:3301 (tool_event + turn_traces, role=guest, select-only)
 ```
+
+It reads the **whole evidence base**, not just the memory space: `tool_event`
+(11 864 tool calls — the defect ledger), `turn_traces` (what a turn cost),
+`agent_runtime_config` + `agent_revision` (the revision timeline, read only as
+a time marker), and `rb_insight` (documented insights and their `uses`
+counter). The board states which ledger it used (`meta.defect_source`) and
+which spaces it could not read.
 
 Each agent becomes a station, each tool call whose recorded status is not `ok`
-becomes a defect, and the standard is the fleet median. Measured on the day it
-was wired: 749 tool calls, 58 defects, fleet rate 7.74 per 100 against a
-standard of 4.07 — **three stations abnormal** (predman 17.16, geosupply 10.57,
-tanya 9.30), thirteen documented lessons, seven verdicts with real attempt
-traces. The chip in the header swaps to the demo and back; if the memory is
-unreachable the server falls back to the demo **and says so**.
+becomes a defect, and the standard is the fleet median. Measured over the whole
+ledger: **11 868 tool calls, 1 000 defects, fleet rate 8.43 per 100 against a
+standard of 7.67 — four stations abnormal** (predman 17.26, geosupply 10.66,
+tanya 10.16, ginger 8.12). The chip in the header swaps to the demo and back;
+if the memory is unreachable the server falls back to the demo **and says so**.
+
+Three things the measurement reports about *itself*, because they are the
+result:
+
+* **Coverage** — only **661 of 11 868 events (5.6 %)** are attributable to a
+  configuration at all. The rest come from agents with no runtime config, and
+  those are the high-volume ones (`ginger`, `tanya`, `trin`).
+* **Comparability** — every station's *after* window holds fewer than 30
+  events, so no before/after claim is supportable anywhere. Thin windows are
+  drawn hollow and labelled `NOT COMPARABLE`.
+* **Non-adoption** — of 83 documented insights, **61 were never used once**.
+  They are drawn as *not-spread*: written down and never applied, let alone
+  passed to a sibling.
 
 The wiring **never writes back**. Four things enforce it: the connection role
 (`guest`, no space grants), the statements (`select` only), a runtime guard

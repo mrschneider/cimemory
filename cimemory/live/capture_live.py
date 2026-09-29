@@ -36,6 +36,10 @@ OBSERVER = "gemba-observer"
 # The only two TBP steps a read-only observer legitimately performs.
 OBSERVED_STEPS = ["1-clarify", "2-breakdown"]
 
+# How many unused insights to draw on the yokoten view. The counts are always
+# reported in full in the frame meta; the drawing is capped for legibility.
+INSIGHT_FRAME_CAP = 20
+
 STEPS = ["1-clarify", "2-breakdown", "3-target", "4-root-cause",
          "5-countermeasures", "6-do", "7-check", "8-hansei",
          "8-standardise", "8-yokoten"]
@@ -106,6 +110,13 @@ class LiveCapture:
                 "ideal": ("every tool call returns ok on the first pass "
                           "(first-pass yield 100)"),
                 "direction": "decrease",
+                "muda": {k: round(v, 2) for k, v in s.muda().items()},
+                "governed": bool(self.m.revisions.get(s.agent)),
+                "windows": [{
+                    "revision": w.revision, "events": w.events,
+                    "defect_rate": round(w.defect_rate, 2),
+                    "comparable": w.comparable,
+                } for w in s.windows],
             }
         return out
 
@@ -138,16 +149,53 @@ class LiveCapture:
     def _store(self) -> Dict[str, Any]:
         m = self.m
         ts_end = m.window[1]
-        standards = [{
-            "id": f"std-{s.agent}",
-            "capability": s.agent,
-            "version": 1,
-            "active": True,
-            "description": (f"fleet standard work: defect rate <= {m.standard} "
-                            f"per 100 tool calls (median over the window)"),
-            "from_experiment": None,
-            "ts": ts_end,
-        } for s in m.stations if s.evidence]
+        # The staircase is the evidence segmented by configuration revision:
+        # each step is a real window with a real defect rate. A step below
+        # the evidence floor says so in its own label — it is never drawn as
+        # if it proved something.
+        standards = []
+        for s in m.stations:
+            if not s.evidence:
+                continue
+            wins = s.windows or []
+            if wins:
+                for idx, w in enumerate(wins):
+                    standards.append({
+                        "id": f"std-{s.agent}-{w.revision}",
+                        "capability": s.agent,
+                        "version": idx + 1,
+                        "active": idx == len(wins) - 1,
+                        "description": (
+                            f"{w.revision}: {w.defect_rate:.2f} per 100 over "
+                            f"{w.events} tool calls"
+                            + ("" if w.comparable else
+                               " — NOT COMPARABLE (below the evidence floor)")),
+                        "from_experiment": None,
+                        "ts": w.end,
+                    })
+            else:
+                standards.append({
+                    "id": f"std-{s.agent}",
+                    "capability": s.agent,
+                    "version": 1,
+                    "active": True,
+                    "description": (f"fleet standard work: defect rate <= "
+                                    f"{m.standard} per 100 tool calls "
+                                    "(median over the window)"),
+                    "from_experiment": None,
+                    "ts": ts_end,
+                })
+
+        # The yokoten spreads must point at a standard that actually exists,
+        # so they resolve against the station's *active* step - the id now
+        # carries the revision window, not just the agent name.
+        active_std: Dict[str, str] = {}
+        for _std in standards:
+            if _std["active"]:
+                active_std[_std["capability"]] = _std["id"]
+        # None when the station has no measured standard at all: the wall
+        # keeps the finding but must not invent a standard to hang it on.
+        std_id = lambda a: active_std.get(a)  # noqa: E731
 
         problems = []
         for s in m.abnormal:
@@ -229,7 +277,7 @@ class LiveCapture:
 
         spreads = [{
             "id": f"yokoten-{key}-{i}",
-            "standard_id": f"std-{group[0].agent}",
+            "standard_id": std_id(group[0].agent),
             "from_agent": group[0].agent,
             "targets": sorted({l.agent for l in group}) or [group[0].agent],
             "rationale": (f"{key} fails again in {len(group)} separate notes "
@@ -239,6 +287,24 @@ class LiveCapture:
             "ts": group[-1].ts,
         } for i, (key, group) in enumerate(sorted(
             self.recurrence.items(), key=lambda kv: kv[1][-1].ts))]
+
+        # Yokoten: an insight that was written down and never used since.
+        # Uses=0 is the measured form of "the countermeasure never entered
+        # practice" — the failure the board exists to make visible.
+        unused = [i for i in m.insights if i.uses == 0]
+        for n, i in enumerate(unused[:INSIGHT_FRAME_CAP]):
+            spreads.append({
+                "id": f"insight-unused-{n}",
+                "standard_id": std_id(i.agent),
+                "from_agent": i.agent,
+                "targets": [i.agent],
+                "rationale": (f"'{i.title}' was documented {_iso(i.created_ts)} "
+                              f"and never used since (uses=0): it never entered "
+                              f"practice, let alone spread. "
+                              f"{len(unused)} of {len(m.insights)} insights are unused."),
+                "applied": False,
+                "ts": i.created_ts,
+            })
 
         andons = [{
             "id": f"andon-{s.agent}",
@@ -438,6 +504,28 @@ def build_live(source: Optional[ReadOnlyTarantool] = None,
         "steps_performed": OBSERVED_STEPS,
         "steps_not_performed": NOT_PERFORMED,
         "loop_ran": False,
+        "defect_source": m.defect_source,
+        "unavailable_spaces": m.unavailable,
+        "muda_standards": m.muda_standards,
+        "coverage": {
+            "events_total": m.coverage.events_total,
+            "events_with_config": m.coverage.events_with_config,
+            "share": round(m.coverage.share, 1),
+            "agents_governed": m.coverage.agents_governed,
+            "agents_ungoverned": m.coverage.agents_ungoverned,
+        },
+        "insights": {
+            "total": len(m.insights),
+            "used": sum(1 for i in m.insights if i.uses > 0),
+            "unused": sum(1 for i in m.insights if i.uses == 0),
+            "top": [{"agent": i.agent, "title": i.title, "uses": i.uses}
+                    for i in m.insights[:5]],
+        },
+        "revisions": {a: [{"revision": r.revision,
+                           "activated": _iso(r.activated_ts),
+                           "reason": r.reason, "actor": r.actor}
+                          for r in revs]
+                      for a, revs in m.revisions.items()},
         "fleet": {"defect_rate": round(m.defect_rate, 2),
                   "tool_calls": m.n_tool_calls,
                   "defects": m.n_defects,

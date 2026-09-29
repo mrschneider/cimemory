@@ -1,18 +1,40 @@
-"""Live (read-only) wiring of cimemory to production agent memory."""
+"""Live (read-only) wiring of cimemory to production agent telemetry."""
 
 from .source import (  # noqa: F401
+    DEFAULT_HOST,
+    DEFAULT_PORT,
+    MUDA_AXES,
+    SPACE_INSIGHT,
+    SPACE_MEMORY,
+    SPACE_REVISION,
+    SPACE_RUNTIME_CONFIG,
+    SPACE_TOOL_EVENT,
+    SPACE_TURN_TRACES,
+    Coverage,
     FleetMeasurement,
+    Insight,
     Lesson,
     ReadOnlyTarantool,
+    Revision,
+    SpaceUnavailable,
     Station,
+    ToolEvent,
+    TracePoint,
     Turn,
     Verdict,
+    Window,
     classify_strength,
     measure,
+    normalise_agent,
     probe,
 )
 
 __all__ = [
-    "FleetMeasurement", "Lesson", "ReadOnlyTarantool", "Station", "Turn",
-    "Verdict", "classify_strength", "measure", "probe",
+    "Coverage", "FleetMeasurement", "Insight", "Lesson", "ReadOnlyTarantool",
+    "Revision", "SpaceUnavailable", "Station", "ToolEvent", "TracePoint",
+    "Turn", "Verdict", "Window", "classify_strength", "measure",
+    "normalise_agent", "probe", "MUDA_AXES",
+    "SPACE_MEMORY", "SPACE_TOOL_EVENT", "SPACE_TURN_TRACES",
+    "SPACE_RUNTIME_CONFIG", "SPACE_REVISION", "SPACE_INSIGHT",
+    "DEFAULT_HOST", "DEFAULT_PORT",
 ]

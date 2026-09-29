@@ -13,10 +13,12 @@
       const stds = f.store.standards || [];
       const sib = ctx.meta.siblings || [];
       const capOf = (sid) => {
+        if (!sid) return "no standard yet";
         const s = stds.find((x) => x.id === sid);
         return s ? s.capability : "?";
       };
       const verOf = (sid) => {
+        if (!sid) return "not standardised";
         const s = stds.find((x) => x.id === sid);
         return s ? "v" + s.version : "";
       };

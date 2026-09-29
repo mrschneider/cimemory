@@ -253,6 +253,41 @@ a first-class requirement, not a deployment detail.
 - **R15.8 — Degradation is announced.** If the observed store is unreachable,
   the consumer must not silently substitute a fixture for production. It falls
   back visibly, naming the source it actually served.
+- **R15.9 — Read the widest available ledger, and name it.** A store usually
+  keeps several views of the same work at different granularities. The observer
+  reads the widest one that exists, reports which it used, and states which
+  spaces it could not read. Falling back to a narrower source is allowed;
+  doing so silently is not.
+- **R15.10 — Cost axes are measured, not converted.** Latency, token volume
+  and call counts are different quantities in different units. Each is
+  compared against the standard *for that axis*. They are never summed into a
+  single score, and an axis nobody measures is absent rather than zero.
+
+### R16 — Comparability (a difference you are allowed to claim)
+
+An observer that can segment evidence in time will be tempted to call any
+difference an improvement. A store must carry what is needed to judge whether
+a comparison is sound at all.
+
+- **R16.1 — A change marker is a time marker, not a cause.** Records that
+  date a change (revision, release, deploy) let the observer segment evidence.
+  The observer must present the segmentation as segmentation and never claim
+  the change produced the difference.
+- **R16.2 — Every window declares its comparability.** Each measurement window
+  carries the event count and a flag for whether it clears the evidence floor.
+  A window below the floor is displayed as non-comparable, so a thin sample
+  cannot be read as a result.
+- **R16.3 — A standard is never lowered to fit a bad shift.** A baseline is
+  the best level the unit has actually held. A worse period leaves the
+  standard where it was; it never moves to accommodate it.
+- **R16.4 — An invented baseline is a fabricated measurement.** Where no
+  control group exists in the records, no control is drawn. The absence is
+  stated rather than filled with a modelled or projected line.
+- **R16.5 — Attribution coverage is reported.** The observable share of
+  evidence that can be tied to a change must be stated. Where a large share of
+  the work comes from units that carry no change marker, that is itself the
+  headline finding: the work cannot be attributed, so it cannot be improved
+  by measurement alone.
 
 ---
 
