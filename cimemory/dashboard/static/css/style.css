@@ -504,3 +504,41 @@ svg { display: block; width: 100%; height: auto; }
 .sv-step { font-family: var(--disp); font-size: 12.5px; font-weight: 500; fill: var(--dim); letter-spacing: 0.03em; }
 .sv-step.on { fill: var(--paper); }
 .sv-strong { font-family: var(--disp); font-size: 15px; font-weight: 600; fill: var(--paper); }
+
+/* ── source chip: is this board reading production memory or a script? ── */
+.src-chip {
+  display: flex; align-items: center; gap: 9px;
+  flex: 0 0 auto; white-space: nowrap; align-self: center;
+  background: rgba(255,255,255,.03);
+  border: 1px solid var(--line);
+  border-radius: 3px;
+  padding: 6px 9px;
+  cursor: pointer;
+  font-family: var(--mono);
+  text-align: left;
+  transition: background .15s, border-color .15s;
+}
+.src-chip:hover { background: rgba(255,255,255,.07); }
+.src-chip .dot {
+  width: 9px; height: 9px; border-radius: 50%;
+  background: var(--faint); flex: 0 0 auto;
+}
+.src-chip.live .dot {
+  background: var(--green);
+  box-shadow: 0 0 0 3px rgba(47,208,127,.16), 0 0 10px rgba(47,208,127,.55);
+}
+.src-chip.fallback .dot { background: var(--amber); }
+.src-chip .src-txt {
+  display: flex; flex-direction: column; line-height: 1.35;
+  white-space: nowrap;
+}
+.src-chip b {
+  font-size: 10.5px; letter-spacing: .13em; text-transform: uppercase;
+  color: var(--paper);
+}
+.src-chip i { font-size: 9.5px; font-style: normal; color: var(--faint); }
+.src-chip .src-swap {
+  font-size: 8.5px; letter-spacing: .12em; text-transform: uppercase;
+  color: var(--faint); border-left: 1px solid var(--line); padding-left: 8px;
+}
+.src-chip.fallback b { color: var(--amber); }

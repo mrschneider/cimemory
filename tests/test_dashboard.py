@@ -20,7 +20,7 @@ import pytest  # noqa: E402
 
 from cimemory.dashboard.capture import build  # noqa: E402
 from cimemory.dashboard.server import (  # noqa: E402
-    Handler, STATIC_DIR, load_data,
+    Handler, STATIC_DIR, load_demo,
 )
 
 FRAME_KEYS = {
@@ -192,8 +192,16 @@ def test_every_view_declares_its_id():
 
 @pytest.fixture(scope="module")
 def server(tmp_path_factory):
-    """A real server on an ephemeral port."""
-    load_data(regen=False)
+    """A real server on an ephemeral port, pinned to the demo source.
+
+    The live source reads production memory; tests must not depend on a
+    running Tarantool, so the fixture points it at a dead port and asks for
+    ``demo`` explicitly.
+    """
+    load_demo(regen=False)
+    Handler.source = "demo"
+    Handler.tnt_host = "127.0.0.1"
+    Handler.tnt_port = 9  # discard port: probe fails fast, deterministic
     srv = ThreadingHTTPServer(("127.0.0.1", 0), Handler)
     t = threading.Thread(target=srv.serve_forever, daemon=True)
     t.start()
@@ -212,7 +220,12 @@ def test_health_endpoint(server):
     status, _, body = _get(server + "/api/health")
     assert status == 200
     j = json.loads(body)
-    assert j["ok"] is True and j["n_frames"] > 0
+    assert j["ok"] is True
+    assert j["default_source"] == "demo"
+    assert j["demo"]["cached_frames"] > 0
+    # the live probe is reported honestly, not assumed
+    assert j["live"]["reachable"] is False
+    assert j["live"]["readonly"] is True
 
 
 def test_data_endpoint_and_gzip(server):

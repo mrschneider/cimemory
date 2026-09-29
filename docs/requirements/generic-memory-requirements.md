@@ -216,6 +216,44 @@ visible (Principle 7).
   the discipline is enforced in the plugin, but the store must at least not
   offer a bypass that skips the plugin.
 
+### R15 — Read-only observation (consuming a store the loop must not change)
+
+The loop is not the only consumer of memory. An improvement *board* observes a
+running fleet, and observing must never be able to mutate production. This is
+a first-class requirement, not a deployment detail.
+
+- **R15.1 — The adapter may be read-only.** An adapter may implement the read
+  path and refuse the write path. Refusal must be loud (raise), never a silent
+  no-op: a caller that believes it standardised something must not be told
+  nothing happened.
+- **R15.2 — Read-only is enforced by the substrate, not by convention.** The
+  credential used must lack write grants. A guard must verify this at connect
+  time and refuse to run otherwise, so a future edit cannot quietly promote an
+  observer to a writer.
+- **R15.3 — Reads are paged and bounded.** An observer may not depend on
+  holding the store in memory: `select` with `limit`/`offset`, or a cursor.
+- **R15.4 — Observation is derived, never invented.** Every figure shown must
+  be recomputable from records. If a quantity cannot be derived (a root cause,
+  a target, a deadline), the answer is *absent*, and absence is displayed as
+  such. A board that fabricates a plausible cause is worse than one that shows
+  a blank.
+- **R15.5 — A read-only observer performs no cycle step that requires an
+  actor.** Clarify and break down the gap: yes, that is measurement. Set a
+  target, act, check, standardise: no — those write improvement work back.
+  The consumer must report the steps it did not perform, so the dashboard
+  cannot be mistaken for a completed loop.
+- **R15.6 — The standard may be established but unverified.** When the
+  baseline is derived from fleet statistics rather than a passing experiment,
+  it must be marked as such (`from_experiment: None`), so nobody reads a
+  median as proof.
+- **R15.7 — Statistics must state their population.** A rate over a small
+  sample must not set a target. The consumer declares a minimum evidence
+  threshold, and stations below it are reported but excluded from the standard
+  and from the goal.
+- **R15.8 — Degradation is announced.** If the observed store is unreachable,
+  the consumer must not silently substitute a fixture for production. It falls
+  back visibly, naming the source it actually served.
+
 ---
 
 ## 3. Non-functional requirements
@@ -282,6 +320,36 @@ than asserted.
 A production deployment commonly pairs two: a record store (R1–R10) plus a vector
 index (R11.3), with the journal living in the record store.
 
+### The observed store: Ratiocore agent memory (Tarantool)
+
+The live board reads a store that was not built for this contract, which makes
+it the useful test of R15. `box.space.agent_memory` holds one tuple per turn,
+`[turn_id, profile, role, content, embedding, metadata]`, and maps onto the
+requirements as follows:
+
+| Contract need | How the store serves it | Verdict |
+|---|---|---|
+| R1 identity | `turn_id` (primary key) | served |
+| R2 journal | append-only in practice; `ts` in metadata gives the timeline | served by convention, not by a declared journal |
+| R3 enumeration | `select(nil, {limit, offset})` paging; `by_profile` index | served |
+| R8 provenance | `metadata.source`, `status`, `importance` | served |
+| R11 retrieval | `embedding` column, no vector index declared here | not used by the board |
+| R6 capabilities | not declared anywhere | **gap** — the adapter must state them |
+| R12 observability | no counters | **gap** |
+| R15 read-only | `guest` role has no space grants; reads are plain `select` | served |
+| — | **no write path is used at all**: the board never calls `insert`/`replace`/`update` | by design |
+
+The two gaps are exactly the kind the contract predicts: a store written for a
+different purpose will lack a declared capability descriptor and counters. The
+board works because it needs neither — and it says so rather than pretending
+the memory implements R6 or R12.
+
+Roles, not kinds, are the mapping seam: `tool` carries the defect signal
+(`status`), `lesson` the documented countermeasures, `outcome` the verdicts
+with their attempt traces. A store that keeps these as separate record *kinds*
+(as this repo's `models.py` does) satisfies the same requirement more cleanly
+under R1 and R3.
+
 ---
 
 ## 7. Conformance suite (acceptance criteria)
@@ -302,9 +370,26 @@ fixture parametrisation. The suite asserts, per backend:
 9. Every discipline guard fires identically on every backend.
 10. `close()` is idempotent and flushing.
 
+For a read-only adapter (R15) the suite asserts instead:
+
+1. The module contains no mutation call (`insert`/`replace`/`update`/`delete`/
+   `truncate`/`upsert`) — asserted against the source, not by review.
+2. No write method is exposed on the reader's public surface.
+3. A credential holding a write grant is refused at connect time.
+4. Reads are paged, and a read pass makes exactly one pass over the store.
+5. Every figure produced is recomputable from the records read; quantities that
+   cannot be derived are absent, not guessed.
+6. A store with fewer records than the evidence threshold cannot set the
+   standard or the goal.
+7. An unreachable store is reported as unreachable; the consumer does not
+   silently serve a fixture.
+8. The steps of the cycle that need an actor are reported as not performed.
+
 Adding a backend means: implement ten methods, register it with
 `register_backend(name, factory)`, add it to the fixture parametrisation. Nothing
-in the plugin or the loop changes.
+in the plugin or the loop changes. A read-only observer is a *consumer*, not a
+backend: it implements no write path at all and therefore never claims to be a
+store.
 
 ---
 
@@ -321,3 +406,8 @@ in the plugin or the loop changes.
 | R11 | Genchi genbutsu before acting: look before you leap |
 | R13, N7 | Long-term philosophy: the store must outlive one release (Principle 1) |
 | R14 | Nemawashi and honest reporting: evidence over assertion (Principle 13) |
+| R15.1, R15.2 | Jidoka: a process that cannot act must not pretend to (Principle 5) |
+| R15.4, R15.6 | Genchi genbutsu and hansei: see what is there, admit what is not (Principle 12, 14) |
+| R15.5 | Standard work: the observer's job is defined, and excludes acting |
+| R15.7 | Muda discipline: do not let a small sample set a target |
+| R15.8 | Visual control: a degraded signal must be visible, never hidden |

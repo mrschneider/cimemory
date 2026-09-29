@@ -20,18 +20,43 @@ function ctxOf() {
 
 /* ------------------------------- boot ------------------------------- */
 
-async function boot() {
-  const r = await fetch("/api/data");
+async function boot(source) {
+  const q = source ? "?source=" + encodeURIComponent(source) : "";
+  const r = await fetch("/api/data" + q);
   const data = await r.json();
   App.meta = data.meta;
   App.frames = data.frames;
   App.state.pick = App.frames[0].cap || Object.keys(App.meta.stations)[0];
+  renderSource();
   buildNav();
   buildZones();
   wireTransport();
   setView("andon");
-  go(0, true);
+  // A live capture is a single observation, so open on the settled board and
+  // let the scrubber walk back through how it was reached. The demo is a
+  // programme and opens at its first frame.
+  go(App.source === "live" ? App.frames.length - 1 : 0, true);
   requestAnimationFrame(tick);
+}
+
+/* Which memory is this board looking at — and can it write to it? */
+function renderSource() {
+  const chip = $("#src-chip"), m = App.meta;
+  const served = m.served_source || "demo";
+  const live = served === "live";
+  App.source = served;
+  chip.classList.toggle("live", live && !m.source_note);
+  chip.classList.toggle("fallback", !live || !!m.source_note);
+  $("#src-name").textContent = live ? "live · read-only" : "demo programme";
+  const f = m.fleet || {};
+  $("#src-detail").textContent = live
+    ? `${f.tool_calls || 0} calls · ${f.defects || 0} defects · ${f.open_andons || 0} andons`
+    : (m.source_note || "scripted seven-cycle programme");
+  chip.title = (m.source || "") + (m.source_note ? "\n" + m.source_note : "");
+  chip.onclick = function () { boot(live ? "demo" : "live"); };
+  document.title = live
+    ? "cimemory · live " + (f.defect_rate != null ? f.defect_rate + " per 100" : "") + " · Gemba Board"
+    : "cimemory · demo · Gemba Board";
 }
 
 function buildNav() {
@@ -47,8 +72,10 @@ function buildNav() {
     nav.appendChild(item);
   });
   const foot = el("div", "nav-foot");
+  const src = App.source === "live" ? "live memory (ro)" : "demo";
   foot.innerHTML = `agent <b>${esc(App.meta.agent)}</b><br>` +
-    `${App.meta.n_frames} frames · ${App.meta.n_cycles} cycles<br>` +
+    `${App.meta.n_frames} frames · <b>${src}</b><br>` +
+    `${esc(App.meta.window_label || (App.meta.n_cycles + " cycles"))}<br>` +
     `1–7 switch · space plays`;
   nav.appendChild(foot);
 }
@@ -110,7 +137,11 @@ function readouts(f) {
   $("#ro-std").textContent = stds;
   $("#ro-andon").innerHTML = andons
     ? `<span style="color:var(--red)">${andons}</span>` : "0";
-  $("#ro-cyc").textContent = f.cycle;
+  if (App.meta.loop_ran === false) {
+    $("#ro-cyc").innerHTML = `–<small>not run</small>`;
+  } else {
+    $("#ro-cyc").textContent = f.cycle;
+  }
   $("#ro-kaizen").innerHTML = kaizen + `<small> std'd</small>`;
   $("#ro-cm").innerHTML = best
     ? `<span style="color:${STRENGTH_COLOR[best]}">${BEST_LABEL[best]}</span>`

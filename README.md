@@ -141,6 +141,42 @@ Design rationale, frame schema and how to add a view:
 
 ---
 
+## Live: the board reads production memory (read-only)
+
+By default the board opens on **real agent memory in Tarantool**
+(`agent_memory`, port 3301), not on the script:
+
+```
+live  · ratiocore agent_memory @ 127.0.0.1:3301 (agent_memory, role=guest, select-only)
+```
+
+Each agent becomes a station, each tool call whose recorded status is not `ok`
+becomes a defect, and the standard is the fleet median. Measured on the day it
+was wired: 749 tool calls, 58 defects, fleet rate 7.74 per 100 against a
+standard of 4.07 — **three stations abnormal** (predman 17.16, geosupply 10.57,
+tanya 9.30), thirteen documented lessons, seven verdicts with real attempt
+traces. The chip in the header swaps to the demo and back; if the memory is
+unreachable the server falls back to the demo **and says so**.
+
+The wiring **never writes back**. Four things enforce it: the connection role
+(`guest`, no space grants), the statements (`select` only), a runtime guard
+that raises if the user could write, and a test that inspects the module's own
+source for mutation calls. Because an observer may see and stratify a gap but
+may not act on it, live mode performs **steps 1 and 2 of the ten** and reports
+the rest as not performed — the wheel lights two steps, and `cycles run` reads
+*not run*. The A3 of the worst station shows an empty root cause, because
+memory holds none.
+
+```bash
+python3 -m cimemory.dashboard --host 0.0.0.0 --port 8700   # live, LAN-visible
+python3 -m cimemory.dashboard --source demo                # the scripted programme
+```
+
+Full contract, space schema and the Toyota→memory mapping table:
+[`docs/integration/live-agent-memory.md`](docs/integration/live-agent-memory.md)
+
+---
+
 ## Experiment 001
 
 `experiments/experiment_001_kaizen_cycle.py` runs a complete TBP cycle — a
@@ -159,7 +195,7 @@ Run it:
 
 ```bash
 python experiments/experiment_001_kaizen_cycle.py
-python -m pytest tests/ -q        # 73 passed
+python -m pytest tests/ -q        # 105 passed
 ```
 
 ---
@@ -174,14 +210,18 @@ cimemory/
 │   ├── plugin.py      EvolutionMemory: semantics + enforcement + A3
 │   ├── loop.py        KaizenLoop, KaizenSpec, kaizen/kaikaku gate
 │   └── backends/      memory · sqlite · jsonl
+│   ├── live/          READ-ONLY wiring to production agent memory
+│   │   ├── source.py        Tarantool reader + the Toyota derivation
+│   │   └── capture_live.py  the same frame contract, from real memory
 │   └── dashboard/     the Gemba Board (stdlib server + static UI)
 │       ├── capture.py   deterministic telemetry over the real plugin
-│       ├── server.py    http.server, no dependencies
+│       ├── server.py    http.server, no dependencies; ?source=live|demo
 │       └── static/      index.html · css · js (7 views, hand-written SVG)
 ├── docs/
 │   ├── research/      the full Toyota methodology research
 │   ├── architecture/  concept→code map, invariants, wiring
 │   ├── requirements/  generic (DB-agnostic) memory requirements
+│   ├── integration/   the read-only production wiring
 │   └── visualization/ the Gemba Board: design language + frame schema
 ├── experiments/       experiment_001 — the real cycle
 └── tests/             contract, discipline, loop, portability, dashboard
