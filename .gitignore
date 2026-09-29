@@ -11,5 +11,8 @@ venv/
 *.sqlite3
 *.jsonl
 !experiments/*.jsonl
+
+# generated telemetry — the server rebuilds it on first run
+cimemory/dashboard/data/frames.json
 .DS_Store
 ._*

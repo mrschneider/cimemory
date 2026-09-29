@@ -1,0 +1,253 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1"/>
+<title>cimemory · Gemba Board</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Saira+Condensed:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="/static/css/style.css">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='6' fill='%23101416'/%3E%3Ccircle cx='16' cy='16' r='9' fill='none' stroke='%23ffb020' stroke-width='3'/%3E%3Ccircle cx='16' cy='16' r='3' fill='%23ffb020'/%3E%3C/svg%3E">
+</head>
+<body>
+<div id="app">
+
+  <!-- ══════════════ shift header ══════════════ -->
+  <header>
+    <div class="brand">
+      <span class="name">ci<em>memory</em></span>
+      <span class="sub">gemba board · shop floor of the improving agent</span>
+    </div>
+
+    <div class="readouts">
+      <div class="readout"><span class="k">stations ok</span><span class="v" id="ro-ok">–</span></div>
+      <div class="readout"><span class="k">standards live</span><span class="v" id="ro-std">0</span></div>
+      <div class="readout"><span class="k">open andons</span><span class="v" id="ro-andon">0</span></div>
+      <div class="readout"><span class="k">cycles run</span><span class="v" id="ro-cyc">0</span></div>
+      <div class="readout"><span class="k">kaizen idx</span><span class="v" id="ro-kaizen">–</span></div>
+      <div class="readout"><span class="k">strongest cm</span><span class="v" id="ro-cm">–</span></div>
+    </div>
+
+    <div class="master" id="master">
+      <span class="lamp lg" id="master-lamp"></span>
+      <div class="master-txt">
+        <span class="k">line status</span>
+        <strong id="master-label">OBSERVING</strong>
+      </div>
+    </div>
+  </header>
+
+  <!-- ══════════════ floor ══════════════ -->
+  <main>
+    <nav id="nav"></nav>
+
+    <div id="stage">
+
+      <!-- ── 1 · THE ANDON BOARD ───────────────────────────── -->
+      <section class="view" id="view-andon">
+        <div class="view-head">
+          <div>
+            <h2>The <span class="thin">Andon Board</span></h2>
+            <p class="lede">Every station on the floor, live. A green lamp means the
+            reading sits inside its standard. Amber means the standard is drifting.
+            Red means the line stopped. <b>Nothing is allowed to hide.</b></p>
+          </div>
+          <div class="hint" id="andon-hint">—</div>
+        </div>
+        <div class="stations" id="andon-stations"></div>
+        <div class="grid c-2">
+          <div class="panel">
+            <div class="p-head"><h3>andon log</h3><span class="aux">stop-the-line signals</span></div>
+            <div class="p-body"><div class="scroll" id="andon-log"></div></div>
+          </div>
+          <div class="panel">
+            <div class="p-head"><h3>discipline refusals</h3><span class="aux">the plugin said no</span></div>
+            <div class="p-body"><div class="scroll" id="andon-refusals"></div></div>
+          </div>
+        </div>
+      </section>
+
+      <!-- ── 2 · THE WHEEL ─────────────────────────────────── -->
+      <section class="view" id="view-wheel">
+        <div class="view-head">
+          <div>
+            <h2>The <span class="thin">Wheel</span></h2>
+            <p class="lede">Toyota Business Practices — PDCA drawn as eight stations.
+            <b>Five of the eight are Plan</b>, because almost every failure is a rush
+            through understanding. The outer ring turns once per improvement cycle.</p>
+          </div>
+          <div class="hint" id="wheel-hint">—</div>
+        </div>
+        <div class="grid c-wheel">
+          <div class="panel">
+            <div class="p-head"><h3>pdca · tbp 8 steps</h3><span class="aux" id="wheel-aux">—</span></div>
+            <div class="p-body"><div id="wheel-svg"></div></div>
+          </div>
+          <div class="panel">
+            <div class="p-head"><h3>step counters</h3><span class="aux">cumulative, whole programme</span></div>
+            <div class="p-body"><div id="wheel-tally"></div></div>
+          </div>
+        </div>
+      </section>
+
+      <!-- ── 3 · THE STAIRCASE ─────────────────────────────── -->
+      <section class="view" id="view-staircase">
+        <div class="view-head">
+          <div>
+            <h2>The <span class="thin">Staircase</span></h2>
+            <p class="lede">A standard is never lowered and never deleted. Each
+            standardised countermeasure raises the baseline one step and resets it —
+            that is the ratchet. The dashed line is the identical agent <i>without</i>
+            memory: it drifts the other way.</p>
+          </div>
+          <div class="grid chips-line" id="stair-pick"></div>
+        </div>
+        <div class="grid c-1">
+          <div class="panel">
+            <div class="p-head"><h3 id="stair-title">standard vs actual vs control</h3>
+              <div class="legend">
+                <span><i class="sw std"></i>standard</span>
+                <span><i class="sw act"></i>actual</span>
+                <span><i class="sw ctl"></i>no-memory control</span>
+                <span><i class="sw goal"></i>goal</span>
+              </div>
+            </div>
+            <div class="p-body"><div id="stair-svg"></div></div>
+          </div>
+        </div>
+        <div class="grid c-2">
+          <div class="panel">
+            <div class="p-head"><h3>version history</h3><span class="aux">supersession chain</span></div>
+            <div class="p-body"><div id="stair-versions"></div></div>
+          </div>
+          <div class="panel">
+            <div class="p-head"><h3>read this</h3></div>
+            <div class="p-body"><div class="note">
+              <p>Every step down is one cycle: <b>plan</b> five times over, <b>do</b> once,
+              <b>check</b> on results <i>and</i> process, <b>act</b> by folding the
+              countermeasure into the standard.</p>
+              <p class="dim">A rejected countermeasure leaves the staircase flat — the
+              baseline does not move until the gain is proven to hold.</p>
+              <p class="dim">A <b>kaikaku</b> is the only jump: the roots change, not the
+              process.</p>
+            </div></div>
+          </div>
+        </div>
+      </section>
+
+      <!-- ── 4 · THE A3 ────────────────────────────────────── -->
+      <section class="view" id="view-a3">
+        <div class="view-head">
+          <div>
+            <h2>The <span class="thin">A3</span></h2>
+            <p class="lede">The whole problem on one sheet, the way Toyota insists on it.
+            Left is Plan, right is Do–Check–Act. The constraint is the discipline: if it
+            does not fit, you do not understand it yet.</p>
+          </div>
+          <div class="hint" id="a3-hint">—</div>
+        </div>
+        <div class="a3" id="a3-sheet"></div>
+      </section>
+
+      <!-- ── 5 · THE FIVE WHYS ─────────────────────────────── -->
+      <section class="view" id="view-whys">
+        <div class="view-head">
+          <div>
+            <h2>The <span class="thin">Five Whys</span></h2>
+            <p class="lede">Symptom at the top, cause at the bottom. Each rung must be
+            something you <i>observed</i>. Then the chain is read backwards with
+            “therefore” — if that sentence sounds wrong, the cause is not a cause.</p>
+          </div>
+          <div class="hint" id="whys-hint">—</div>
+        </div>
+        <div class="grid c-whys">
+          <div class="panel">
+            <div class="p-head"><h3>causal chain</h3><span class="aux">why, and why that</span></div>
+            <div class="p-body"><div id="whys-ladder"></div></div>
+          </div>
+          <div class="panel">
+            <div class="p-head"><h3>therefore test</h3><span class="aux">read bottom-up</span></div>
+            <div class="p-body"><div id="whys-test"></div></div>
+          </div>
+        </div>
+      </section>
+
+      <!-- ── 6 · THE LEDGER ────────────────────────────────── -->
+      <section class="view" id="view-ledger">
+        <div class="view-head">
+          <div>
+            <h2>The <span class="thin">Ledger</span></h2>
+            <p class="lede">Waste is the enemy: <i>muda</i> (waste), <i>mura</i>
+            (unevenness), <i>muri</i> (overburden). Each station carries the waste it
+            was opened against. The ladder shows how far up the countermeasure
+            strength scale the programme has climbed.</p>
+          </div>
+          <div class="hint" id="ledger-hint">—</div>
+        </div>
+        <div class="grid c-2">
+          <div class="panel">
+            <div class="p-head"><h3>waste ledger</h3><span class="aux">per station</span></div>
+            <div class="p-body"><div id="ledger-rows"></div></div>
+          </div>
+          <div class="panel">
+            <div class="p-head"><h3>countermeasure strength ladder</h3><span class="aux">contain → fix → prevent</span></div>
+            <div class="p-body"><div id="ledger-ladder"></div></div>
+          </div>
+        </div>
+      </section>
+
+      <!-- ── 7 · YOKOTEN ───────────────────────────────────── -->
+      <section class="view" id="view-yokoten">
+        <div class="view-head">
+          <div>
+            <h2>The <span class="thin">Yokoten</span></h2>
+            <p class="lede">A problem solved in one place is almost always present
+            somewhere else. Yokoten is horizontal spread: the countermeasure <i>and</i>
+            the thinking behind it travel together.</p>
+          </div>
+          <div class="hint" id="yokoten-hint">—</div>
+        </div>
+        <div class="grid c-yoko">
+          <div class="panel">
+            <div class="p-head"><h3>spread map</h3><span class="aux">proven standard → sibling agent</span></div>
+            <div class="p-body"><div id="yoko-svg"></div></div>
+          </div>
+          <div class="panel">
+            <div class="p-head"><h3>spread log</h3></div>
+            <div class="p-body"><div class="scroll" id="yoko-log"></div></div>
+          </div>
+        </div>
+      </section>
+
+    </div>
+  </main>
+
+  <!-- ══════════════ transport ══════════════ -->
+  <footer id="transport">
+    <div class="clock" id="clock">—</div>
+    <button id="btn-play" class="tb">▶&nbsp;&nbsp;play</button>
+    <button id="btn-step" class="tb">step</button>
+    <button id="btn-restart" class="tb">⟲</button>
+    <button id="btn-end" class="tb">⇥</button>
+    <div class="spd">
+      <input type="range" id="spd" min="0" max="4" step="1" value="1"/>
+      <span id="spd-val">1×</span>
+    </div>
+    <div class="scrub" id="scrub"><div class="scrub-zones" id="scrub-zones"></div><div class="scrub-cursor" id="scrub-cursor"></div></div>
+    <div class="ticker" id="ticker">—</div>
+  </footer>
+
+</div>
+
+<script src="/static/js/svg.js"></script>
+<script src="/static/js/views/andon.js"></script>
+<script src="/static/js/views/wheel.js"></script>
+<script src="/static/js/views/staircase.js"></script>
+<script src="/static/js/views/a3.js"></script>
+<script src="/static/js/views/whys.js"></script>
+<script src="/static/js/views/ledger.js"></script>
+<script src="/static/js/views/yokoten.js"></script>
+<script src="/static/js/app.js"></script>
+</body>
+</html>

@@ -63,6 +63,15 @@ class CountermeasureSpec:
     risk: str = "low"
 
 
+def normalize_countermeasure(raw: Any) -> CountermeasureSpec:
+    """Accept a CountermeasureSpec, or a compact ``(description, strength)`` pair."""
+    if isinstance(raw, CountermeasureSpec):
+        return raw
+    if isinstance(raw, (tuple, list)) and len(raw) == 2:
+        return CountermeasureSpec(description=raw[0], strength=raw[1])
+    return CountermeasureSpec(description=str(raw))
+
+
 @dataclass
 class KaizenSpec:
     """Everything one full cycle needs. One problem, one target, one experiment."""
@@ -80,7 +89,9 @@ class KaizenSpec:
     whys: list[tuple[str, str, str]] = field(default_factory=list)  # (q, a, evidence)
     root_cause: str = ""
     root_cause_verified_by: str = ""
-    countermeasures: list[CountermeasureSpec] = field(default_factory=list)
+    countermeasures: list[Any] = field(default_factory=list)  # CountermeasureSpec | (desc, strength)
+    cm_effects: dict[str, str] = field(default_factory=dict)  # desc -> expected effect
+    do_log: list[str] = field(default_factory=list)           # step 6 entries
     hypothesis: str = ""
     before_value: Optional[float] = None
     after_value: Optional[float] = None
@@ -158,11 +169,14 @@ class KaizenLoop:
         done.append("4-root-cause")
 
         cm_ids: list[str] = []
-        for cm in spec.countermeasures:
+        for raw in spec.countermeasures:
+            cm = normalize_countermeasure(raw)
             rec = mem.propose_countermeasure(
                 problem.problem_id, cm.description,
                 strength=cm.strength, root_cause_id=rc.root_cause_id,
-                expected_effect=cm.expected_effect, cost=cm.cost, risk=cm.risk,
+                expected_effect=cm.expected_effect or spec.cm_effects.get(
+                    cm.description, ""),
+                cost=cm.cost, risk=cm.risk,
             )
             cm_ids.append(rec.countermeasure_id)
         done.append("5-countermeasures")
@@ -171,6 +185,8 @@ class KaizenLoop:
             problem.problem_id, target.target_id, spec.hypothesis, cm_ids,
             metric=spec.metric, before_value=baseline,
         )
+        for entry in spec.do_log:
+            mem.log_do(exp.experiment_id, entry)
         done.append("6-do")
 
         chk = mem.check(

@@ -110,6 +110,37 @@ suite.
 
 ---
 
+## The Gemba Board (visualization)
+
+```bash
+python3 -m cimemory.dashboard        # -> http://127.0.0.1:8700
+```
+
+A replayable board of one improvement programme, in the visual language of a shop
+floor: andon lamps, hazard tape, graph-paper ground, punched A3 dockets. Every
+view is a **Toyota management artifact**, not a chart.
+
+| View | Toyota artifact |
+|---|---|
+| **Andon Board** | the andon board above the line — five stations, their lamps, standards vs actual, waste class, and the log of stop-the-line signals and refusals |
+| **The Wheel** | PDCA / Toyota Business Practices — the eight TBP steps, five of them Plan |
+| **The Staircase** | standard work as a ratchet — the standard never lowers, the no-memory control drifts the other way |
+| **The A3** | the single-sheet report — left Plan, right Do-Check-Act |
+| **The Five Whys** | the causal ladder at the gemba, plus the Therefore Test read backwards |
+| **The Ledger** | muda accounting and the countermeasure strength ladder (taisho -> taisaku -> mizen-boushi) |
+| **Yokoten** | horizontal spread of a proven standard to sibling agents |
+
+The telemetry is **not a mock**: `dashboard/capture.py` drives the real
+`EvolutionMemory` + `KaizenLoop` through seven cycles and snapshots the store
+after every semantic event, so each frame shows what the plugin actually held at
+that instant. Deterministic, and served with **zero dependencies** - the server is
+`http.server`, the frontend is hand-written SVG and plain JavaScript.
+
+Design rationale, frame schema and how to add a view:
+[`docs/visualization/gemba-board.md`](docs/visualization/gemba-board.md)
+
+---
+
 ## Experiment 001
 
 `experiments/experiment_001_kaizen_cycle.py` runs a complete TBP cycle — a
@@ -128,7 +159,7 @@ Run it:
 
 ```bash
 python experiments/experiment_001_kaizen_cycle.py
-python -m pytest tests/ -q        # 57 passed
+python -m pytest tests/ -q        # 73 passed
 ```
 
 ---
@@ -143,12 +174,17 @@ cimemory/
 │   ├── plugin.py      EvolutionMemory: semantics + enforcement + A3
 │   ├── loop.py        KaizenLoop, KaizenSpec, kaizen/kaikaku gate
 │   └── backends/      memory · sqlite · jsonl
+│   └── dashboard/     the Gemba Board (stdlib server + static UI)
+│       ├── capture.py   deterministic telemetry over the real plugin
+│       ├── server.py    http.server, no dependencies
+│       └── static/      index.html · css · js (7 views, hand-written SVG)
 ├── docs/
 │   ├── research/      the full Toyota methodology research
 │   ├── architecture/  concept→code map, invariants, wiring
-│   └── requirements/  generic (DB-agnostic) memory requirements
+│   ├── requirements/  generic (DB-agnostic) memory requirements
+│   └── visualization/ the Gemba Board: design language + frame schema
 ├── experiments/       experiment_001 — the real cycle
-└── tests/             contract, discipline, loop, portability
+└── tests/             contract, discipline, loop, portability, dashboard
 ```
 
 ---
@@ -156,8 +192,9 @@ cimemory/
 ## Scope of this repo
 
 Implemented: the **memory plugin for agent evolution** (the loop, the record
-model, the enforcement, three reference backends) and the **generic memory
-requirements** that make the evolution work.
+model, the enforcement, three reference backends), the **generic memory
+requirements** that make the evolution work, and the **Gemba Board**
+visualization of a full improvement programme.
 
 Deliberately not implemented here: a production database adapter, an embedding
 pipeline, and the agents themselves. Those plug into the contract above.
