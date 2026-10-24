@@ -172,7 +172,7 @@ def test_wheel_step_counts_are_cumulative(data):
 # --------------------------------------------------------------------------
 
 def test_static_assets_exist(tmp_path):
-    idx = (STATIC_DIR / "index.html").read_text()
+    idx = (STATIC_DIR / "index.html").read_text(encoding="utf-8")
     for v in VIEWS:
         assert (STATIC_DIR / f"js/views/{v}.js").is_file(), v
         assert f'id="view-{v}"' in idx, f"index.html has no section for {v}"
@@ -183,10 +183,10 @@ def test_static_assets_exist(tmp_path):
 
 def test_every_view_declares_its_id():
     for v in VIEWS:
-        src = (STATIC_DIR / f"js/views/{v}.js").read_text()
+        src = (STATIC_DIR / f"js/views/{v}.js").read_text(encoding="utf-8")
         assert f'id: "{v}"' in src, f"{v}.js does not register id {v!r}"
         assert "GEMBA_VIEWS.push" in src, v
-    app = (STATIC_DIR / "js/app.js").read_text()
+    app = (STATIC_DIR / "js/app.js").read_text(encoding="utf-8")
     assert "GEMBA_VIEWS" in app
 
 

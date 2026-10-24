@@ -982,7 +982,7 @@ def main() -> None:
     data = build()
     DATA_DIR.mkdir(parents=True, exist_ok=True)
     out = DATA_DIR / "frames.json"
-    out.write_text(json.dumps(data, separators=(",", ":")))
+    out.write_text(json.dumps(data, separators=(",", ":")), encoding="utf-8")
     kb = out.stat().st_size / 1024
     print(f"wrote {out} — {data['meta']['n_frames']} frames, "
           f"{data['meta']['n_cycles']} cycles, {kb:.0f} KB")

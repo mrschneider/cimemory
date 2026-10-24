@@ -60,9 +60,9 @@ def load_demo(regen: bool = False) -> dict[str, Any]:
             from .capture import build
             data = build()
             DATA_DIR.mkdir(parents=True, exist_ok=True)
-            FRAMES_FILE.write_text(json.dumps(data, separators=(",", ":")))
+            FRAMES_FILE.write_text(json.dumps(data, separators=(",", ":")), encoding="utf-8")
         else:
-            data = json.loads(FRAMES_FILE.read_text())
+            data = json.loads(FRAMES_FILE.read_text(encoding="utf-8"))
         slot["data"] = data
     slot["loaded_at"] = time.time()
     return slot["data"]
