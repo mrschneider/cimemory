@@ -9,6 +9,9 @@ enforces the loop** — it refuses to record an unverified root cause, refuses t
 standardise a gain that was never checked, and refuses to lock a change in
 without reflection.
 
+![cimemory — the PDCA discipline loop for agent evolution](docs/cimemory-architecture.jpg)
+*The PDCA discipline loop: plan with root-cause evidence, do a countermeasure, check the improvement, act by standardising and sharing — with andon stopping the line when something is wrong.*
+
 ```python
 from cimemory import EvolutionMemory, KaizenLoop, KaizenSpec, get_backend
 
