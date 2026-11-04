@@ -51,8 +51,9 @@ def test_meta_is_complete(data):
     assert m["n_frames"] == len(data["frames"])
     assert m["n_cycles"] >= 7
     assert len(m["steps"]) == 10
-    # every step is classified into a PDCA phase
-    assert set(m["pdca"]) == set(m["steps"])
+    # every step is classified into a PDCA phase (plus the rework frame kind)
+    assert set(m["steps"]) <= set(m["pdca"])
+    assert m["pdca"]["rework"] == "Do"
     assert sum(1 for s in m["steps"] if m["pdca"][s] == "Plan") == 5
 
 

@@ -416,6 +416,13 @@ class Capture:
                    cap=cap, step="7-check", problem_id=problem.problem_id,
                    extra={"results_met": chk.results_met,
                           "process_holds": chk.process_holds})
+        if not chk.process_holds:
+            self.frame("rework", f"6 · Do — reworked",
+                       "the check failed, so the loop does not move on: the "
+                       "countermeasure goes back to Do and the standard only "
+                       "changes once it holds.",
+                       cap=cap, step="6-do", problem_id=problem.problem_id,
+                       extra={"rework": True, "reason": "check failed"})
 
         self.mem.hansei(exp.experiment_id, went_well=spec.went_well,
                         went_poorly=spec.went_poorly, why=spec.reflection_why,
@@ -971,7 +978,7 @@ def build() -> dict[str, Any]:
         "pdca": {
             "1-clarify": "Plan", "2-breakdown": "Plan", "3-target": "Plan",
             "4-root-cause": "Plan", "5-countermeasures": "Plan",
-            "6-do": "Do", "7-check": "Check",
+            "6-do": "Do", "7-check": "Check", "rework": "Do",
             "8-hansei": "Act", "8-standardise": "Act", "8-yokoten": "Act",
         },
     }

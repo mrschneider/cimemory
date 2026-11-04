@@ -115,6 +115,7 @@ function setClock() {
     : f.kind === "andon" ? "andon"
     : f.kind === "refusal" ? "discipline holds"
     : f.kind === "kaikaku" ? "kaikaku gate"
+    : f.kind === "rework" ? "rework — back to do"
     : f.kind;
   $("#clock").innerHTML =
     `<b>C${String(f.cycle).padStart(2, "0")}</b> · f${String(App.frame).padStart(3, "0")}/${App.frames.length - 1}` +
