@@ -118,6 +118,7 @@ class CycleOutcome:
     spread_id: Optional[str] = None
     a3: str = ""
     steps_completed: list[str] = field(default_factory=list)
+    rework: list[str] = field(default_factory=list)  # failed Check -> which step to re-examine
 
     @property
     def improved(self) -> bool:
@@ -220,6 +221,20 @@ class KaizenLoop:
                 spread_id = spread.spread_id
                 done.append("8-yokoten")
 
+        rework: list[str] = []
+        if not chk.successful:
+            if not chk.results_met:
+                rework.append(
+                    "4-root-cause / 5-countermeasures: results did not reach the "
+                    f"target ({chk.after_value} vs {target.goal}) — the "
+                    "countermeasures are not attacking the true root cause"
+                )
+            if not chk.process_holds:
+                rework.append(
+                    "7-check (process): the conditions that hold the gain are not "
+                    "in place — implement before re-measuring; a result without a "
+                    "holding process is a one-off, not an improvement"
+                )
         return CycleOutcome(
             problem_id=problem.problem_id,
             target_id=target.target_id,
@@ -230,6 +245,7 @@ class KaizenLoop:
             spread_id=spread_id,
             a3=mem.a3(problem.problem_id),
             steps_completed=done,
+            rework=rework,
         )
 
     # -- sustain: the step everyone forgets --------------------------------
@@ -238,6 +254,12 @@ class KaizenLoop:
         """Follow-up audit: is the standard still held?
 
         Standards drift. Without a follow-up the old condition quietly returns.
+
+        Escalation (Principle 5, jidoka): the *first* drift is a warning — the
+        line is told. A drift that repeats while the previous one is still open
+        is a sustained failure of the standard, so the cord is pulled: the andon
+        escalates to ``critical`` and ``stopped`` becomes True. Resolving the
+        andon resets the streak, so a one-off blip never halts work.
         """
         std = self.mem.active_standard(capability)
         if std is None:
@@ -249,16 +271,26 @@ class KaizenLoop:
         if target is None:
             raise DisciplineError("experiment references a missing target")
         holds = Target(**target).met(observed_value)
+        severity: Optional[str] = None
+        stopped = False
         if not holds:
+            prefix = f"standard drift on {capability}"
+            open_drift = [a for a in self.mem.open_andons(self.mem.agent)
+                          if a["reason"].startswith(prefix)]
+            sustained = len(open_drift) > 0
+            severity = "critical" if sustained else "warning"
+            stopped = sustained
             self.mem.andon(
-                f"standard drift on {capability}: {observed_value} violates "
+                f"{prefix}: {observed_value} violates "
                 f"target {target['goal']} (v{std['version']})",
-                severity="warning", stopped=False,
+                severity=severity, stopped=stopped,
             )
         self.mem._log("standard_audit", capability=capability,
-                      standard_id=std["standard_id"], holds=holds)
+                      standard_id=std["standard_id"], holds=holds,
+                      severity=severity, stopped=stopped)
         return {"standard_id": std["standard_id"], "holds": holds,
-                "observed": observed_value, "goal": target["goal"]}
+                "observed": observed_value, "goal": target["goal"],
+                "severity": severity, "stopped": stopped}
 
     # -- history -----------------------------------------------------------
 

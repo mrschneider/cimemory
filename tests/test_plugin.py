@@ -264,6 +264,49 @@ def test_audit_detects_standard_drift(mem):
     assert len(andons) == 1 and "standard drift" in andons[0]["reason"]
 
 
+def test_audit_drift_escalates_and_stops_the_line(mem):
+    """jidoka: a first drift warns; a sustained one pulls the cord (critical, stopped).
+
+    Resolving the andon resets the streak, so a later blip is a warning again.
+    """
+    loop = KaizenLoop(mem)
+    loop.run(_spec())
+    first = loop.audit_standard(CAP, 900.0)
+    assert first["holds"] is False and first["severity"] == "warning"
+    assert first["stopped"] is False
+
+    second = loop.audit_standard(CAP, 950.0)
+    assert second["holds"] is False and second["severity"] == "critical"
+    assert second["stopped"] is True
+
+    # resolving the drift resets the escalation streak
+    for a in mem.open_andons(mem.agent):
+        if a["reason"].startswith(f"standard drift on {CAP}"):
+            mem.resolve_andon(a["andon_id"], "re-standardised the join path")
+    again = loop.audit_standard(CAP, 920.0)
+    assert again["severity"] == "warning" and again["stopped"] is False
+
+
+def test_failed_check_returns_rework(mem):
+    """A failed Check names the step to re-examine, not just 'did not pass'."""
+    loop = KaizenLoop(mem)
+    # results missed the target, process held -> re-examine root cause / countermeasures
+    out = loop.run(_spec(after_value=700.0, process_holds=True, spread_to=[]))
+    assert out.check_passed is False
+    assert any("root cause" in r for r in out.rework)
+    assert not any("process" in r for r in out.rework)
+
+    # results met, process did not -> re-examine the Check (process) step
+    out2 = loop.run(_spec(after_value=420.0, process_holds=False, spread_to=[]))
+    assert out2.check_passed is False
+    assert any("process" in r for r in out2.rework)
+    assert not any("root cause" in r for r in out2.rework)
+
+    # a clean pass has nothing to rework
+    out3 = loop.run(_spec())
+    assert out3.check_passed is True and out3.rework == []
+
+
 def test_kaikaku_needs_approval(mem):
     loop = KaizenLoop(mem)
     from cimemory import ChangeScope
