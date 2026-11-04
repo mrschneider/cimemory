@@ -64,6 +64,14 @@ Plus the two mechanisms that make it survive contact with reality:
   stops the line the moment an abnormality appears.
 - **Sustain** — `loop.audit_standard(capability, observed_value)` detects standard
   drift later and raises an andon. Standards decay; this is the follow-up.
+  A first drift is a **warning**; a drift that repeats while the previous one is
+  still open is sustained, so the cord is pulled: the andon escalates to
+  **critical** and the line stops. Resolving the andon resets the streak, so a
+  one-off blip never halts work.
+- **Rework** — a failed Check does not just say "did not pass":
+  `CycleOutcome.rework` names the step to re-examine (root cause /
+  countermeasures when results missed the target; the process of Check when the
+  conditions that hold the gain are missing).
 
 ---
 
