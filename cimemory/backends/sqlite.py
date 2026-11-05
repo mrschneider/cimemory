@@ -9,6 +9,7 @@ methods.
 from __future__ import annotations
 
 import json
+import re
 import sqlite3
 import time
 from typing import Any, Optional
@@ -41,6 +42,11 @@ CREATE TABLE IF NOT EXISTS journal (
 """
 
 
+# A plain top-level payload field name: "ts", "opened_ts". Anything else
+# (dotted paths, quotes, SQL) is rejected so order_by can never inject SQL.
+_FIELD_RE = re.compile(r"^[A-Za-z_][A-Za-z0-9_]*$")
+
+
 class SQLiteBackend(BaseBackend):
     def __init__(self, path: str = ":memory:") -> None:
         self._conn = sqlite3.connect(path)
@@ -48,6 +54,7 @@ class SQLiteBackend(BaseBackend):
         self._conn.executescript(_SCHEMA)
         self._conn.commit()
         self._path = path
+        self._closed = False
 
     # ----- required -------------------------------------------------------
 
@@ -87,6 +94,14 @@ class SQLiteBackend(BaseBackend):
             pass
         order_col = "ts"
         if order_by:
+            # order_by is interpolated into SQL: it must be a plain top-level
+            # payload field name (e.g. "ts", "opened_ts") — anything else is
+            # rejected so it can never inject SQL.
+            if not _FIELD_RE.match(order_by):
+                raise ValueError(
+                    f"Invalid order_by: {order_by!r} (expected a plain field "
+                    "name like 'ts' or 'opened_ts')"
+                )
             order_col = f"json_extract(payload, '$.{order_by}')"
         sql += f" ORDER BY {order_col} {'DESC' if descending else 'ASC'}"
         rows = self._conn.execute(sql, params).fetchall()
@@ -117,10 +132,9 @@ class SQLiteBackend(BaseBackend):
         )
 
     def close(self) -> None:
-        try:
+        if not self._closed:
             self._conn.close()
-        except sqlite3.ProgrammingError:
-            pass
+            self._closed = True
 
     # ----- optional -------------------------------------------------------
 

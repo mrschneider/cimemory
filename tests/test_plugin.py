@@ -110,6 +110,49 @@ def test_backend_contract(mem):
         assert [e["event"] for e in b.journal(since=2.0)] == ["y"]
 
 
+# --------------------------------------------------------------------------
+# discipline — the plugin must refuse shortcuts
+# --------------------------------------------------------------------------
+
+def test_enum_tuple_serialization():
+    """Regression test: ``_plain`` must turn Enums and tuples into plain
+    JSON-safe values (enum -> ``.value``, tuple -> list) so every backend
+    stores and the dashboard serialises the same thing."""
+    import json
+    from enum import Enum
+
+    from cimemory.models import _plain
+
+    class Direction(Enum):
+        increase = 1
+        decrease = -1
+
+    # Enums become their values
+    assert _plain(Direction.increase) == 1
+    assert _plain(Direction.decrease) == -1
+
+    # Tuples are normalised to lists (a JSON round-trip always yields lists)
+    assert _plain((1, 2, 3)) == [1, 2, 3]
+
+    # Mixed container — a list containing an enum and a tuple
+    assert _plain([Direction.increase, (10, 20)]) == [1, [10, 20]]
+
+    # Nested structures
+    nested = {
+        "enum": Direction.decrease,
+        "tuple": (True, False),
+        "list": [Direction.increase, (42,)],
+    }
+    assert _plain(nested) == {
+        "enum": -1,
+        "tuple": [True, False],
+        "list": [1, [42]],
+    }
+
+    # The real contract: the result must be JSON-serialisable
+    json.dumps(_plain(nested))
+
+
 def test_capabilities_are_truthful():
     assert not InMemoryBackend().capabilities().durable
     assert SQLiteBackend(":memory:").capabilities().transactional
