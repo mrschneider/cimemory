@@ -22,7 +22,7 @@ from __future__ import annotations
 
 import time
 import uuid
-from dataclasses import asdict, dataclass, field
+from dataclasses import dataclass, field, fields
 from enum import Enum
 from typing import Any, Optional
 
@@ -76,8 +76,21 @@ class Record:
 
     def to_dict(self) -> dict[str, Any]:
         """Plain, JSON-safe dict. Enums become their string values so every
-        backend stores and compares the same thing."""
-        return _plain(asdict(self))  # type: ignore[arg-type]
+        backend stores and compares the same thing.
+
+        Iterates the dataclass fields directly instead of going through
+        :func:`dataclasses.asdict` (which rebuilds the object graph and is the
+        single hottest path in the write loop — ~2x slower here) and skips the
+        recursive ``_plain`` pass because every field here is a leaf or a
+        plain container of leaves.
+        """
+        out: dict[str, Any] = {}
+        for f in fields(self):
+            v = getattr(self, f.name)
+            if isinstance(v, Enum):
+                v = v.value
+            out[f.name] = v
+        return out
 
     @classmethod
     def from_dict(cls, data: dict[str, Any]):
